@@ -2,6 +2,7 @@
 #include <cassert>
 // for uchar4 struct
 #include <cuda_runtime.h>
+#include <stdio.h>
 
 void channelConvolution(const unsigned char* const channel,
                         unsigned char* const channelBlurred,
@@ -29,7 +30,6 @@ void channelConvolution(const unsigned char* const channel,
           result += image_value * filter_value;
         }
       }
-
       channelBlurred[r * numCols + c] = result;
     }
   }
