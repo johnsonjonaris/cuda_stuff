@@ -14,6 +14,7 @@ void referenceCalculation(const uchar4* const rgbaImage,
       greyImage[r * numCols + c] = channelSum;
 	  if (r ==48 && c==110) {
 		  printf("CPU value = %f\n", channelSum);
+		  printf("CPU value = %d\n", greyImage[r * numCols + c]);
 	  }
     }
   }
