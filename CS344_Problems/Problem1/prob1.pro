@@ -21,6 +21,8 @@ DESTDIR     = $$system(pwd)
 OBJECTS_DIR = $$DESTDIR/Obj
 # C++ flags
 QMAKE_CXXFLAGS_RELEASE =-O3
+QMAKE_CXXFLAGS += -std=c++11 -fpermissive
+
 # Cuda sources
 CUDA_SOURCES += student_func.cu
 

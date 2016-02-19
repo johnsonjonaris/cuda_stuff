@@ -53,15 +53,18 @@ void rgba_to_greyscale(const uchar4* const rgbaImage,
 	//calculate a 1D offset
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
 	int r = blockIdx.y * blockDim.y + threadIdx.y;
-	if (r < numRows && c < numCols)
-	{
-		int pixelId = r*numCols + c;
-		greyImage[pixelId] =
-				.299f * rgbaImage[pixelId].x +
-				.587f * rgbaImage[pixelId].y +
-				.114f * rgbaImage[pixelId].z;
+	if (r >= numRows || c >= numCols)
+		return;
+	int pixelId = r*numCols + c;
+	float channelSum =
+			0.299f * rgbaImage[pixelId].x +
+			0.587f * rgbaImage[pixelId].y +
+			0.114f * rgbaImage[pixelId].z;
+	greyImage[pixelId] = (channelSum);
+	if (r ==48 && c==110) {
+		printf("GPU value = %f\n", channelSum);
+		printf("GPU value = %d\n", greyImage[pixelId]);
 	}
-
 }
 
 void your_rgba_to_greyscale(const uchar4 * const h_rgbaImage, uchar4 * const d_rgbaImage,
