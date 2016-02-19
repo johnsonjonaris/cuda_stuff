@@ -115,13 +115,15 @@ float getMin(const float * const data, int nElements)
 {
 	const int numThreads = block*block;
 	const int numBlocks = nElements/numThreads;
+	printf("nElements = %d, nThreads = %d, nBlocks = %d\n", nElements, numThreads, numBlocks);
 	unsigned int sharedSize = numThreads*sizeof(float);
 	float *partial, *d_result;
 	checkCudaErrors(cudaMalloc(&partial, numBlocks*sizeof(float)));
 	checkCudaErrors(cudaMalloc(&d_result, sizeof(float)));
 
 	min_reduce<<<numBlocks,numThreads,sharedSize>>>(data, nElements, partial);
-	min_reduce<<<1,numThreads,sharedSize>>>(partial, numBlocks, d_result);
+	sharedSize = numBlocks*sizeof(float);
+	min_reduce<<<1,numBlocks,sharedSize>>>(partial, numBlocks, d_result);
 	float h_result;
 	checkCudaErrors(cudaMemcpy(&h_result, d_result, sizeof(float), cudaMemcpyDeviceToHost));
 	checkCudaErrors(cudaFree(partial));
@@ -163,7 +165,8 @@ float getMax(const float * const data, int nElements)
 	checkCudaErrors(cudaMalloc(&d_result, sizeof(float)));
 
 	max_reduce<<<numBlocks,numThreads,sharedSize>>>(data, nElements, partial);
-	max_reduce<<<1,numThreads,sharedSize>>>(partial, numBlocks, d_result);
+	sharedSize = numBlocks*sizeof(float);
+	max_reduce<<<1,numBlocks,sharedSize>>>(partial, numBlocks, d_result);
 	float h_result;
 	checkCudaErrors(cudaMemcpy(&h_result, d_result, sizeof(float), cudaMemcpyDeviceToHost));
 	checkCudaErrors(cudaFree(partial));
