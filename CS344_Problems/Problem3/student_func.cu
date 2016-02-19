@@ -6,7 +6,7 @@
 
   A High Dynamic Range (HDR) image contains a wider variation of intensity
   and color than is allowed by the RGB format with 1 byte per channel that we
-  have used in the previous assignment.  
+  have used in the previous assignment.
 
   To store this extra information we use single precision floating point for
   each channel.  This allows for an extremely wide range of intensity values.
@@ -80,25 +80,124 @@
 */
 
 #include "utils.h"
+#include "stdio.h"
+#include "thrust/device_ptr.h"
+#include "thrust/extrema.h"
+#include "thrust/reduce.h"
+
+int block = 16;
+#define FLOAT_MAX 1e+37
+
+__global__
+void min_reduce(const float* const in, int nElements, float *d_min)
+{
+	extern __shared__ float shared[];
+	int tid = threadIdx.x;
+	int gid = (blockDim.x * blockIdx.x) + tid;
+	shared[tid] = FLOAT_MAX;
+
+	if (gid < nElements)
+		shared[tid] = in[gid];
+	__syncthreads();
+
+	for (unsigned int s=blockDim.x/2; s>0; s>>=1)
+	{
+		if (tid < s && gid < nElements)
+			shared[tid] = min(shared[tid], shared[tid + s]);
+		__syncthreads();
+	}
+
+	if (gid == 0)
+		d_min[blockIdx.x] = shared[0];
+}
+
+float getMin(const float * const data, int nElements)
+{
+	const int numThreads = block*block;
+	const int numBlocks = nElements/numThreads;
+	unsigned int sharedSize = numThreads*sizeof(float);
+	float *partial, *d_result;
+	checkCudaErrors(cudaMalloc(&partial, numBlocks*sizeof(float)));
+	checkCudaErrors(cudaMalloc(&d_result, sizeof(float)));
+
+	min_reduce<<<numBlocks,numThreads,sharedSize>>>(data, nElements, partial);
+	min_reduce<<<1,numThreads,sharedSize>>>(partial, numBlocks, d_result);
+	float h_result;
+	checkCudaErrors(cudaMemcpy(&h_result, d_result, sizeof(float), cudaMemcpyDeviceToHost));
+	checkCudaErrors(cudaFree(partial));
+	checkCudaErrors(cudaFree(d_result));
+	return h_result;
+}
+
+__global__
+void max_reduce(const float* const in, int nElements, float *d_max)
+{
+	extern __shared__ float shared[];
+	int tid = threadIdx.x;
+	int gid = (blockDim.x * blockIdx.x) + tid;
+	shared[tid] = -FLOAT_MAX;
+
+	if (gid < nElements)
+		shared[tid] = in[gid];
+	__syncthreads();
+
+	for (unsigned int s=blockDim.x/2; s>0; s>>=1)
+	{
+		if (tid < s && gid < nElements)
+			shared[tid] = max(shared[tid], shared[tid + s]);
+		__syncthreads();
+	}
+
+	if (gid == 0)
+		d_max[blockIdx.x] = shared[0];
+}
+
+float getMax(const float * const data, int nElements)
+{
+	const int numThreads = block*block;
+	const int numBlocks = nElements/numThreads;
+	printf("nElements = %d, nThreads = %d, nBlocks = %d\n", nElements, numThreads, numBlocks);
+	unsigned int sharedSize = numThreads*sizeof(float);
+	float *partial, *d_result;
+	checkCudaErrors(cudaMalloc(&partial, numBlocks*sizeof(float)));
+	checkCudaErrors(cudaMalloc(&d_result, sizeof(float)));
+
+	max_reduce<<<numBlocks,numThreads,sharedSize>>>(data, nElements, partial);
+	max_reduce<<<1,numThreads,sharedSize>>>(partial, numBlocks, d_result);
+	float h_result;
+	checkCudaErrors(cudaMemcpy(&h_result, d_result, sizeof(float), cudaMemcpyDeviceToHost));
+	checkCudaErrors(cudaFree(partial));
+	checkCudaErrors(cudaFree(d_result));
+	return h_result;
+}
 
 void your_histogram_and_prefixsum(const float* const d_logLuminance,
-                                  unsigned int* const d_cdf,
-                                  float &min_logLum,
-                                  float &max_logLum,
-                                  const size_t numRows,
-                                  const size_t numCols,
-                                  const size_t numBins)
+								  unsigned int* const d_cdf,
+								  float &min_logLum,
+								  float &max_logLum,
+								  const size_t numRows,
+								  const size_t numCols,
+								  const size_t numBins)
 {
-  //TODO
-  /*Here are the steps you need to implement
-    1) find the minimum and maximum value in the input logLuminance channel
-       store in min_logLum and max_logLum
-    2) subtract them to find the range
-    3) generate a histogram of all the values in the logLuminance channel using
-       the formula: bin = (lum[i] - lumMin) / lumRange * numBins
-    4) Perform an exclusive scan (prefix sum) on the histogram to get
-       the cumulative distribution of luminance values (this should go in the
-       incoming d_cdf pointer which already has been allocated for you)       */
+	//TODO
+	/*Here are the steps you need to implement
+	1) find the minimum and maximum value in the input logLuminance channel
+	   store in min_logLum and max_logLum
+	2) subtract them to find the range
+	3) generate a histogram of all the values in the logLuminance channel using
+	   the formula: bin = (lum[i] - lumMin) / lumRange * numBins
+	4) Perform an exclusive scan (prefix sum) on the histogram to get
+	   the cumulative distribution of luminance values (this should go in the
+	   incoming d_cdf pointer which already has been allocated for you)       */
+	printf("(nRows, nCols) = (%d, %d)\n", numRows, numCols);
+	int nPixels = numRows*numCols;
+	min_logLum = getMin(d_logLuminance, nPixels);
+	max_logLum = getMax(d_logLuminance, nPixels);
+	//const thrust::device_ptr<const float> d_ptr = thrust::device_pointer_cast(d_logLuminance);
+	//min_logLum = thrust::min_element(d_ptr, d_ptr+nPixels)[0];
+	//max_logLum = thrust::max_element(d_ptr, d_ptr+nPixels)[0];
+	printf("GPU: min %f, max %f\n", min_logLum, max_logLum);
+	float lumRange = max_logLum - min_logLum;
 
 
 }
